@@ -866,6 +866,8 @@ nexus mise-a-jour installer       # installer la dernière, après t'avoir montr
 nexus mise-a-jour annuler         # revenir à la version d'avant
 ```
 
+**Publier une version, c'est ton geste.** Une version n'existe que si tu la publies : sur GitHub, dans le dépôt `nexusone`, page *Releases*, « Draft a new release », étiquette `vX.Y.Z` (le numéro écrit dans `nexus/__init__.py`), cible `main`, puis « Publish release ». Le code peut être proposé et poussé sur `main` pendant le développement, mais rien n'est annoncé ni installé tant que tu n'as pas posé l'étiquette. L'environnement où NEXUS est développé n'a d'ailleurs pas le droit de créer d'étiquettes dans ton dépôt : il ne peut pas publier une version à ta place.
+
 Ce qui se passe quand tu installes :
 
 1. NEXUS affiche le numéro de version et **l'empreinte exacte du code**, et attend ton accord. C'est cette empreinte-là qui est installée, pas « la dernière au moment du téléchargement » : si le dépôt change entre-temps, l'installation est refusée.
@@ -910,7 +912,7 @@ Ce qu'il faut savoir :
 - **Si une version change le fichier du service** (son enfermement), `nexus service etat` et la santé le disent, et il faut relancer les commandes `sudo` de `nexus service installer`.
 - **Les données ne reviennent pas en arrière toutes seules.** Si une version transformait les bases et qu'il faille l'annuler, les copies d'avant sont dans `avant-mise-a-jour`, à remettre à la main.
 - **Les moteurs** (colibrì, la voix, Ollama) ne sont pas mis à jour par ce mécanisme : leurs versions figées changent avec les versions de NEXUS, après essai.
-- **Pas essayé depuis le vrai dépôt GitHub sur un vrai mini-PC** : l'essai utilisait un dépôt local.
+- **Pas essayé de bout en bout depuis le vrai dépôt GitHub** : l'essai d'installation utilisait un dépôt local. La lecture des versions sur GitHub, elle, a été vérifiée.
 
 ## 6. Garder ses données : la persistance (avancé)
 
