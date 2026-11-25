@@ -1,0 +1,11 @@
+{
+  "name": "NEXUS",
+  "short_name": "NEXUS",
+  "description": "L'IA de la maison",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1420",
+  "theme_color": "#0d1420",
+  "icons": [{"src": "/icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
+}

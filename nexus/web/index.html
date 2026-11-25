@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1420">
+<title>NEXUS</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main id="appairage" class="ecran-seul" hidden>
+  <img src="/icone.svg" alt="" width="72" height="72">
+  <h1>NEXUS</h1>
+  <p class="discret">L'IA de la maison. Rien ne quitte ton PC.</p>
+  <form id="form-appairage">
+    <p>Sur le PC, lance <code>nexus serveur appairer</code> puis recopie le code affiché.</p>
+    <label for="code">Code d'appairage</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="0000-0000" maxlength="9" required>
+    <label for="nom">Nom de cet appareil</label>
+    <input id="nom" maxlength="40" placeholder="Mon téléphone" required>
+    <button class="principal" type="submit">Appairer</button>
+    <p id="erreur-appairage" class="erreur" role="alert"></p>
+  </form>
+</main>
+
+<div id="appli" hidden>
+  <header>
+    <button id="ouvrir-conversations" class="icone" aria-label="Conversations">☰</button>
+    <div class="titre">
+      <strong>NEXUS</strong>
+      <span id="etat"><span id="voyant"></span><span id="etat-texte">…</span></span>
+    </div>
+    <button id="nouvelle" class="icone" aria-label="Nouvelle conversation">＋</button>
+  </header>
+
+  <aside id="conversations" hidden>
+    <div class="tiroir">
+      <div class="tiroir-tete"><strong>Conversations</strong>
+        <button id="fermer-conversations" class="icone" aria-label="Fermer">✕</button></div>
+      <ul id="liste-conversations"></ul>
+    </div>
+  </aside>
+
+  <section id="vue-discussion" class="vue">
+    <div id="messages" aria-live="polite"></div>
+    <form id="form-question">
+      <label class="option"><input type="checkbox" id="outils" checked> Consulter la machine et les documents</label>
+      <label class="option" id="option-approfondi" hidden><input type="checkbox" id="approfondi"> <span id="texte-approfondi">Réponse approfondie (plus lente)</span></label>
+      <div class="saisie">
+        <textarea id="question" rows="1" placeholder="Pose ta question…" maxlength="8000"></textarea>
+        <button id="micro" class="micro" type="button" aria-label="Dicter la question" hidden>🎤</button>
+        <button id="envoyer" class="principal" type="submit">Envoyer</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="vue-documents" class="vue" hidden>
+    <form id="form-recherche" class="saisie">
+      <input id="recherche" type="search" placeholder="Chercher dans mes documents…" maxlength="300">
+      <button class="principal" type="submit">Chercher</button>
+    </form>
+    <div class="barre">
+      <label class="bouton" for="fichier">Envoyer un document ou une photo</label>
+      <input id="fichier" type="file" accept=".pdf,.jpg,.jpeg,.png,.txt,.md,application/pdf,image/jpeg,image/png,text/plain" hidden>
+      <span id="etat-envoi" class="discret"></span>
+    </div>
+    <div id="rangement" hidden></div>
+    <div id="resultats"></div>
+  </section>
+
+  <section id="vue-agenda" class="vue" hidden>
+    <form id="form-agenda" class="saisie">
+      <input id="phrase-agenda" placeholder="Dentiste demain à 14h, acheter du pain…" maxlength="400">
+      <button class="principal" type="submit">Ajouter</button>
+    </form>
+    <p id="message-agenda" class="discret"></p>
+    <h2>À venir</h2>
+    <div id="evenements"></div>
+    <h2>À faire</h2>
+    <div id="taches"></div>
+    <p class="discret">Dis-le aussi dans la discussion : « rappelle-moi d'appeler le plombier demain à 9h »,
+      « ajoute du lait à ma liste », « raye le lait ». Les rappels arrivent dans l'onglet Maison.</p>
+  </section>
+
+  <section id="vue-maison" class="vue" hidden>
+    <h2>Santé de NEXUS</h2>
+    <div id="sante"></div>
+    <h2>Le journal du matin</h2>
+    <div id="journal"></div>
+    <h2>Le PC de la maison</h2>
+    <ul id="machine" class="lignes"></ul>
+    <h2>Alertes du PC</h2>
+    <ul id="alertes" class="lignes"></ul>
+    <h2>Alertes, téléphone verrouillé</h2>
+    <div id="relais"></div>
+    <h2>Notifications</h2>
+    <div id="notifications"></div>
+    <h2>Courrier important</h2>
+    <div id="courrier"></div>
+    <h2>Activité de NEXUS</h2>
+    <p class="discret">Ce que NEXUS a fait de lui-même, et ce qu'il propose. Tout se défait d'un appui.</p>
+    <div id="activite"></div>
+    <h2>Ce qu'il a le droit de faire seul</h2>
+    <div id="autonomie"></div>
+    <p id="pied" class="discret"></p>
+  </section>
+
+  <nav>
+    <button data-vue="discussion" class="actif">Discussion</button>
+    <button data-vue="documents">Documents<span id="pastille-docs" class="pastille" hidden></span></button>
+    <button data-vue="agenda">Agenda</button>
+    <button data-vue="maison">Maison<span id="pastille" class="pastille" hidden></span></button>
+  </nav>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
