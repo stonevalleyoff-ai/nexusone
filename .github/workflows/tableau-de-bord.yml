@@ -39,9 +39,18 @@ jobs:
       - name: Compiler
         env:
           TDB_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          TDB_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          TDB_KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'tdb' }}
           TDB_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          if [ -n "$TDB_KEYSTORE_FILE" ]; then
+            manque=""
+            [ -z "$TDB_KEYSTORE_PASSWORD" ] && manque="$manque KEYSTORE_PASSWORD"
+            [ -z "$TDB_KEY_PASSWORD" ] && manque="$manque KEY_PASSWORD"
+            if [ -n "$manque" ]; then
+              echo "::error::Secret(s) GitHub manquant(s) ou vide(s) :$manque"
+              exit 1
+            fi
+          fi
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
 
