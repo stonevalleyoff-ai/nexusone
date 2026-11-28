@@ -15,6 +15,12 @@ pas de la confiance qu'on accorde au modèle :
 Les dates sont relevées par des règles strictes (date complète, sur une ligne qui parle d'un
 rendez-vous ou d'une échéance). Un document est une donnée : ce qui y est écrit n'est jamais
 pris pour une consigne.
+
+Depuis la 0.29, un quatrième geste concerne NEXUS lui-même : relancer une de ses propres tâches
+qui a échoué (relève du courrier, sauvegarde, journal…). Une seule relance par échec, une heure
+après, annoncée comme les autres gestes. Si elle échoue aussi, NEXUS s'arrête là et le dit.
+Et une proposition restée sans réponse ne traîne plus quand elle n'a plus d'objet (rendez-vous
+passé, tâche repartie d'elle-même) : elle est classée « périmée », jamais reproposée.
 """
 from __future__ import annotations
 
@@ -38,7 +44,9 @@ GESTURES = {
     'tache': 'Ajouter à la liste une échéance trouvée dans un document',
     'rendez-vous-courriel': 'Noter dans l\'agenda un rendez-vous trouvé dans un courriel',
     'tache-courriel': 'Ajouter à la liste une échéance trouvée dans un courriel',
+    'reprendre-tache': 'Relancer une tâche de NEXUS qui a échoué',
 }
+RETRY_MINUTES = 60                 # une tâche en échec est relancée une fois, pas avant ce délai
 DEFAULT_LEVEL = 'prevenir'
 # Un courriel peut venir de n'importe qui (fausse facture, faux rendez-vous) : par défaut NEXUS
 # demande, là où il agit seul pour les documents que la personne a elle-même envoyés.
@@ -104,6 +112,7 @@ class Autonomy:
     def __init__(self, path: Path | str, levels_path: Path | None, *, library: Any = None, agenda: Any = None,
                  planner: Any = None, daily_limit: int = DAILY_LIMIT):
         self.library, self.agenda, self.planner = library, agenda, planner
+        self.rerun: Any = None       # « relancer cette tâche » : fourni par celui qui exécute les tâches (Runner)
         self.levels_path, self.daily_limit = levels_path, daily_limit
         if str(path) != ':memory:':
             Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -118,7 +127,7 @@ class Autonomy:
                 id INTEGER PRIMARY KEY AUTOINCREMENT, cle TEXT UNIQUE NOT NULL, quand TEXT NOT NULL,
                 geste TEXT NOT NULL, resume TEXT NOT NULL, detail TEXT NOT NULL, source TEXT NOT NULL DEFAULT '',
                 etat TEXT NOT NULL);
-        ''')   # etat : 'fait', 'propose', 'annule', 'refuse'
+        ''')   # etat : 'fait', 'propose', 'annule', 'refuse', 'perime' (sans objet), 'echec' (relance sans succès)
         self.db.commit()
 
     def close(self) -> None:
@@ -200,6 +209,16 @@ class Autonomy:
     # -- les gestes (du code, vérifié) --------------------------------------------------
     def _do(self, gesture: str, detail: dict) -> tuple[dict, str] | None:
         """Exécute un geste ; renvoie (de quoi l'annuler, phrase de compte rendu) ou None s'il échoue."""
+        if gesture == 'reprendre-tache':
+            if self.rerun is None:
+                return None
+            try:
+                result = str(self.rerun(detail['tache']))
+            except Exception:           # la relance a planté comme la première fois : on n'insiste pas
+                return None
+            if result.startswith('échec'):
+                return None
+            return {**detail, 'resultat': result[:200]}, f'Relancé après un échec : {detail["nom"]} → {result[:160]}'
         gesture = gesture.removesuffix('-courriel')
         origin = 'courriel' if 'courriel' in detail else 'document'
         if gesture == 'ranger':
@@ -226,6 +245,8 @@ class Autonomy:
         if act is None or act['etat'] != 'fait':
             return 'Rien à annuler pour cette ligne.'
         detail = act['detail']
+        if act['geste'] == 'reprendre-tache':
+            return 'Rien à défaire : la tâche a seulement été relancée.'
         if act['geste'] == 'ranger':
             undone = self.library.undo(detail.get('lot'))
             if not undone:
@@ -247,6 +268,9 @@ class Autonomy:
         if act is None or act['etat'] != 'propose':
             return 'Cette proposition n\'est plus en attente.'
         done = self._do(act['geste'], act['detail'])
+        if done is None and act['geste'] == 'reprendre-tache':
+            self._set(act_id, 'echec')
+            return 'La tâche a encore échoué. Voir : nexus sante'
         if done is None:
             self._set(act_id, 'refuse')
             return 'Ce geste n\'est plus possible (document déplacé ou déjà rangé).'
@@ -260,13 +284,30 @@ class Autonomy:
         self._set(act_id, 'refuse')
         return True
 
-    def prune(self) -> None:
-        """Écarte les propositions de rangement devenues sans objet (document rangé ou retiré entre-temps)."""
+    def prune(self, now: datetime | None = None) -> None:
+        """Classe les propositions devenues sans objet : document rangé ou retiré entre-temps (écartée),
+        rendez-vous passé, tâche repartie d'elle-même (périmées). Une échéance dépassée reste proposée :
+        une facture en retard compte encore plus qu'avant."""
+        now = now or datetime.now()
         for act in self.acts(200):
-            if act['etat'] == 'propose' and act['geste'] == 'ranger':
-                doc = self.library.document(act['detail'].get('doc', -1)) if self.library is not None else None
+            if act['etat'] != 'propose':
+                continue
+            detail = act['detail']
+            if act['geste'] == 'ranger':
+                doc = self.library.document(detail.get('doc', -1)) if self.library is not None else None
                 if doc is None or not doc['proposal'] or doc['proposal'] == doc['path']:
                     self._set(act['id'], 'refuse')
+            elif act['geste'].startswith('rendez-vous'):
+                try:
+                    start = datetime.fromisoformat(detail['debut'])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if (start.date() < now.date()) if detail.get('journee') else (start < now):
+                    self._set(act['id'], 'perime')
+            elif act['geste'] == 'reprendre-tache' and self.planner is not None:
+                task = self.planner.get(detail.get('tache', ''))
+                if task is None or not task['active'] or not str(task['resultat'] or '').startswith('échec'):
+                    self._set(act['id'], 'perime')
 
     # -- déclenchement ------------------------------------------------------------------
     def _candidates(self, doc: dict[str, Any], today: date) -> list[tuple[str, str, dict, str, bool]]:
@@ -315,7 +356,7 @@ class Autonomy:
         # Les dates d'abord : elles lisent le document à son emplacement actuel, avant le rangement.
         for key, gesture, detail, proposal, sure in sorted(candidates, key=lambda c: c[1] == 'ranger'):
             level = levels[gesture]
-            if level == 'jamais' or (gesture != 'ranger' and self.agenda is None):
+            if level == 'jamais' or (gesture not in ('ranger', 'reprendre-tache') and self.agenda is None):
                 continue
             acts_alone = level in ('prevenir', 'silence') and sure and self._done_today(now) < self.daily_limit
             act_id = self._record(key, gesture, proposal, detail, source, 'propose', now)
@@ -326,6 +367,12 @@ class Autonomy:
                 lines.append('• À valider : ' + proposal)
                 continue
             done = self._do(gesture, detail)
+            if done is None and gesture == 'reprendre-tache':      # une seule relance : on le dit, et on s'arrête là
+                self._set(act_id, 'echec')
+                results.append({'id': act_id, 'geste': gesture, 'etat': 'echec', 'resume': proposal})
+                if level == 'prevenir':
+                    lines.append(f'• Relancée une fois, sans succès : {detail["nom"]}. NEXUS n\'insiste pas : voir nexus sante.')
+                continue
             if done is None:
                 self._set(act_id, 'refuse')
                 continue
@@ -360,8 +407,21 @@ class Autonomy:
                                    True))
         return self._process(candidates, source, now, f'Courriel de {sender} : {message["objet"]}'[:120])
 
+    def handle_failure(self, task: dict[str, Any], now: datetime | None = None) -> list[dict[str, Any]]:
+        """Une tâche de NEXUS a échoué : il la relance (ou le propose), une seule fois pour cet échec."""
+        now = now or datetime.now()
+        name, why = str(task['nom']), str(task['resultat'] or 'échec')[:160]
+        key = f"tache:{task['id']}:{str(task['derniere'] or '')[:16]}"      # ce passage-là, pas les suivants
+        detail = {'tache': task['id'], 'nom': name, 'echec': why}
+        return self._process([(key, 'reprendre-tache', detail, f'Relancer la tâche « {name} » ({why})', True)],
+                             f"tâche {task['id']}", now, f'Tâche « {name} » en échec'[:120])
+
     def tour(self, now: datetime | None = None, classify: bool = True) -> list[dict[str, Any]]:
         """Tournée : regarde le dossier d'arrivée et s'occupe de ce qui n'a pas encore été traité."""
+        try:
+            self.prune(now)              # ce qui n'a plus d'objet ne reste pas « en attente » dans le journal du matin
+        except Exception:
+            pass
         if self.library is None:
             return []
         results = []

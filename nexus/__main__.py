@@ -669,10 +669,11 @@ def cmd_activite(args, settings: Settings) -> int:
         if not (args.valeur and args.niveau):
             print(f"Pour changer : nexus activite niveau GESTE NIVEAU   (niveaux : {', '.join(LEVELS)})")
     else:
-        marks = {'fait': 'fait    ', 'propose': 'PROPOSE ', 'annule': 'annulé  ', 'refuse': 'écarté  '}
+        marks = {'fait': 'fait    ', 'propose': 'PROPOSE ', 'annule': 'annulé  ', 'refuse': 'écarté  ',
+                 'perime': 'périmé  ', 'echec': 'échoué  '}
         acts = autonomy.acts(30)
         for act in reversed(acts):
-            print(f"{act['id']:4}  {act['quand'].replace('T', ' ')}  {marks[act['etat']]} {act['resume']}")
+            print(f"{act['id']:4}  {act['quand'].replace('T', ' ')}  {marks.get(act['etat'], act['etat']):8} {act['resume']}")
         print('Aucun geste pour l\'instant.' if not acts else
               'Défaire : nexus activite annuler N    Répondre à une proposition : nexus activite valider N / refuser N')
     return 0

@@ -731,10 +731,10 @@ async function chargerActivite() {
   const zone = $('activite');
   zone.replaceChildren();
   if (!a.actes.length) zone.append(element('p', 'discret', 'Rien pour l\'instant.'));
-  const etats = { fait: '', propose: 'Proposition', annule: 'Annulé', refuse: 'Écarté' };
+  const etats = { fait: '', propose: 'Proposition', annule: 'Annulé', refuse: 'Écarté', perime: 'Périmé', echec: 'Sans succès' };
   for (const acte of a.actes) {
     const carte = element('div', 'carte' + (acte.etat === 'propose' ? ' non-lue' : ''));
-    carte.append(element('div', acte.etat === 'annule' || acte.etat === 'refuse' ? 'discret' : 'nom', acte.resume));
+    carte.append(element('div', ['annule', 'refuse', 'perime', 'echec'].includes(acte.etat) ? 'discret' : 'nom', acte.resume));
     carte.append(element('div', 'discret', [etats[acte.etat], (acte.quand || '').replace('T', ' à ')].filter(Boolean).join(' · ')));
     const actions = element('div', 'actions');
     if (acte.etat === 'fait') actions.append(agir('Annuler', '', `/api/activite/${acte.id}/annuler`));

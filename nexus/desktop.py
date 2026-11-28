@@ -468,8 +468,9 @@ class NexusDesktop:
             for act in acts:
                 row = tk.Frame(body, bg=PANEL, padx=10, pady=6)
                 row.pack(fill='x', pady=(0, 6))
-                faded = act['etat'] in ('annule', 'refuse')
-                state = {'propose': 'Proposition : ', 'annule': 'Annulé : ', 'refuse': 'Écarté : '}.get(act['etat'], '')
+                faded = act['etat'] in ('annule', 'refuse', 'perime', 'echec')
+                state = {'propose': 'Proposition : ', 'annule': 'Annulé : ', 'refuse': 'Écarté : ',
+                         'perime': 'Périmé : ', 'echec': 'Sans succès : '}.get(act['etat'], '')
                 tk.Label(row, text=state + act['resume'], bg=PANEL, fg=MUTED if faded else INK, font=(FONT, 10),
                          wraplength=520, justify='left').pack(side='left', anchor='w')
                 if act['etat'] == 'fait':

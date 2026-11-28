@@ -1,4 +1,4 @@
-# NEXUS 0.28 — un assistant IA local, sur clé USB ou en serveur maison
+# NEXUS 0.29 — un assistant IA local, sur clé USB ou en serveur maison
 
 On démarre un ordinateur sur une clé USB, sans rien installer ni toucher au disque interne. On arrive sur un bureau Debian 13 (XFCE, en français). La fenêtre NEXUS s'ouvre toute seule : on discute avec une IA qui tourne **entièrement sur la machine** (Ollama, modèle `qwen3:1.7b` préchargé), sans Internet et sans compte.
 
@@ -913,6 +913,38 @@ Ce qu'il faut savoir :
 - **Les données ne reviennent pas en arrière toutes seules.** Si une version transformait les bases et qu'il faille l'annuler, les copies d'avant sont dans `avant-mise-a-jour`, à remettre à la main.
 - **Les moteurs** (colibrì, la voix, Ollama) ne sont pas mis à jour par ce mécanisme : leurs versions figées changent avec les versions de NEXUS, après essai.
 - **Pas essayé de bout en bout depuis le vrai dépôt GitHub** : l'essai d'installation utilisait un dépôt local. La lecture des versions sur GitHub, elle, a été vérifiée.
+
+## NEXUS relance ce qui a échoué, et ne laisse rien traîner (0.29)
+
+Jusqu'ici, quand une tâche de la nuit échouait (réseau coupé au moment de relever le courrier, disque de sauvegarde débranché), NEXUS te prévenait et attendait le passage du lendemain : cinq minutes de coupure à 3h30 coûtaient une journée de courrier. Et une proposition à laquelle tu ne répondais pas restait « en attente » pour toujours, même sans objet.
+
+Les deux changements viennent des essais de NexusOmni, la version de laboratoire où un modèle administre seul une machine jetable. Vingt-cinq essais y montrent la même chose : une panne que rien ne désigne reste en panne, et une question sans réponse attend indéfiniment. Dans NEXUS, ce n'est donc pas au modèle de s'en apercevoir : c'est le code qui détecte, et un geste de la liste fermée qui agit.
+
+**Un geste de plus : relancer une tâche de NEXUS qui a échoué.**
+
+- **Une heure après l'échec, une seule fois.** Si la relance passe, NEXUS l'inscrit dans son activité et te prévient : « Relancé après un échec : Relève du courrier → 3 courriel(s) lu(s) ». Si elle échoue aussi, il le dit (« Relancée une fois, sans succès […] NEXUS n'insiste pas ») et s'arrête là jusqu'au prochain passage prévu. Jamais de boucle.
+- **La sauvegarde attend son disque.** Tant que le disque est absent, la relancer ne servirait à rien ; elle repart dans la minute où il revient.
+- **Aucun modèle n'intervient.** C'est du code : la tâche relancée est exactement celle du passage prévu.
+- **Son niveau se règle comme les autres** : `nexus activite niveau reprendre-tache demander` (ou `prevenir`, réglage de départ, `silence`, `jamais`), ou depuis l'appli. Il n'y a rien à défaire : relancer ne fait rien qu'un passage normal n'aurait fait.
+
+**Une proposition sans réponse ne traîne plus quand elle n'a plus d'objet.**
+
+- Un rendez-vous proposé dont la date est passée, une relance proposée pour une tâche repartie d'elle-même : la proposition est classée « périmée ». Elle n'est jamais reproposée.
+- **Une échéance dépassée reste proposée** : une facture en retard compte encore plus qu'avant.
+- Le journal du matin ne compte donc que ce qui attend vraiment ta réponse.
+
+```bash
+nexus activite                    # « échoué » : relance sans succès ; « périmé » : proposition sans objet
+nexus sante                       # ce qui reste en panne après la relance
+```
+
+Vérifié avec les vraies bases et la vraie commande : relève en échec à 3h31, relancée et réussie à 4h35 ; le lendemain, échec, une relance en échec, puis plus rien jusqu'au surlendemain ; `nexus activite` montre les deux lignes.
+
+Ce qu'il faut savoir :
+
+- **NEXUS ne répare que ses propres tâches.** Un mot de passe de boîte mail refusé, un disque plein, un moteur Ollama arrêté (c'est un service du système, hors de sa cage) : la relance échouera ou n'existera pas, et `nexus sante` continue de le dire.
+- **Une heure, c'est un choix simple** : assez pour qu'une coupure passe, pas assez pour rattraper une panne de la nuit entière. Le passage du lendemain reste le filet.
+- **Les gestes d'entretien du PC lui-même** (arrêter un programme emballé, relancer un service) ne sont toujours pas dans la liste : dans les essais d'Omni, le modèle les réussit quand il agit, mais il n'agit pas à tous les coups, et NEXUS n'a pas les droits pour le faire depuis sa cage.
 
 ## 6. Garder ses données : la persistance (avancé)
 

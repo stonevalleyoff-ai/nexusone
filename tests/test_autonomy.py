@@ -168,6 +168,22 @@ class AutonomyTest(AutonomyCase):
         self.assertEqual(len(self.agenda.events(NOW, datetime(2027, 1, 1))), 1)
         self.assertIn('0 geste(s) fait(s), 0 proposition(s)', runner.run_now('tournee-nuit', NOW))
 
+    def test_a_proposal_whose_appointment_has_passed_expires_but_an_overdue_bill_stays(self):
+        self.autonomy.set_level('rendez-vous', 'demander')
+        self.autonomy.set_level('tache', 'demander')
+        self.autonomy.set_level('ranger', 'jamais')
+        self.autonomy.handle_document(self.receive('photo.txt', ORDONNANCE), NOW)
+        self.autonomy.handle_document(self.receive('facture.txt', FACTURE, 'energie', 'Facture', 'Voltéa', '2026-11-20'), NOW)
+        self.autonomy.prune(datetime(2026, 12, 16, 9, 0))                 # une demi-heure avant le rendez-vous : rien ne bouge
+        self.assertEqual({a['etat'] for a in self.autonomy.acts()}, {'propose'})
+        self.autonomy.prune(datetime(2026, 12, 17, 8, 0))
+        states = {a['geste']: a['etat'] for a in self.autonomy.acts()}
+        self.assertEqual(states, {'rendez-vous': 'perime', 'tache': 'propose'})   # la facture en retard reste à valider
+        waiting = self.autonomy.report(NOW)
+        self.assertIn('1 proposition en attente', waiting)
+        # périmée ne veut pas dire reproposée : le même document n'y revient jamais
+        self.assertEqual(self.autonomy.handle_document(self.library.document(1)['id'], datetime(2026, 12, 17, 8, 5)), [])
+
     def test_report(self):
         doc = self.receive('photo.txt', ORDONNANCE)
         self.autonomy.set_level('ranger', 'demander')
@@ -181,3 +197,115 @@ class AutonomyTest(AutonomyCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Boite:
+    """Une boîte mail qui tombe en panne autant de fois qu'on veut, puis remarche."""
+
+    def __init__(self, failures: int):
+        self.failures, self.calls, self.errors = failures, 0, []
+
+    def accounts(self):
+        return ['perso']
+
+    def collect(self, now, on_message):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise OSError('réseau coupé')
+        return {'lus': 3, 'importants': 0}
+
+
+class Disque:
+    """Une sauvegarde dont le disque est débranché."""
+
+    def __init__(self, destination: Path):
+        self.path, self.calls = destination, 0
+
+    def configured(self):
+        return True
+
+    def destination(self):
+        return self.path
+
+    def run(self, now):
+        self.calls += 1
+        return {'ok': True, 'message': 'sauvegarde faite'} if self.path.exists() else {'ok': False, 'message': 'disque absent'}
+
+
+class RepairTest(AutonomyCase):
+    """Une tâche de NEXUS qui échoue est relancée une fois, une heure après ; jamais en boucle."""
+
+    def runner(self, task: str, **parts) -> Runner:
+        for other in self.planner.tasks():
+            self.planner.set_active(other['id'], other['id'] == task)
+        return Runner(self.planner, autonomy=self.autonomy, **parts)
+
+    def at(self, hour: int, minute: int, day: int = 25) -> datetime:
+        return datetime(2026, 11, day, hour, minute)
+
+    def test_a_failed_task_is_retried_once_an_hour_later_and_said(self):
+        box = Boite(failures=1)
+        runner = self.runner('courrier-nuit', mailbox=box)
+        self.assertEqual(runner.tick(self.at(3, 31)), ['courrier-nuit'])
+        self.assertEqual(self.planner.get('courrier-nuit')['resultat'], 'échec : OSError')
+        runner.tick(self.at(3, 50))
+        self.assertEqual((box.calls, self.autonomy.acts()), (1, []))      # trop tôt : la panne a pu être passagère
+        runner.tick(self.at(4, 35))
+        self.assertEqual(box.calls, 2)
+        self.assertTrue(self.planner.get('courrier-nuit')['resultat'].startswith('3 courriel(s) lu(s)'))
+        act = self.autonomy.acts()[0]
+        self.assertEqual((act['geste'], act['etat']), ('reprendre-tache', 'fait'))
+        self.assertIn('Relancé après un échec : Relève du courrier', act['resume'])
+        self.assertIn('• Relancé après un échec', self.planner.notifications()[0]['texte'])
+        runner.tick(self.at(5, 0))
+        self.assertEqual(box.calls, 2)                                     # réparée : on n'y touche plus
+        self.assertEqual(self.autonomy.undo(act['id']), 'Rien à défaire : la tâche a seulement été relancée.')
+        self.assertEqual(self.autonomy.get(act['id'])['etat'], 'fait')
+
+    def test_a_retry_that_fails_too_is_the_last_one_until_the_next_scheduled_run(self):
+        box = Boite(failures=99)
+        runner = self.runner('courrier-nuit', mailbox=box)
+        for hour, minute in ((3, 31), (4, 35), (5, 40), (9, 0), (23, 0)):
+            runner.tick(self.at(hour, minute))
+        self.assertEqual(box.calls, 2)                                     # le passage prévu, une relance, puis plus rien
+        act = self.autonomy.acts()[0]
+        self.assertEqual((act['geste'], act['etat']), ('reprendre-tache', 'echec'))
+        self.assertIn('Relancée une fois, sans succès', self.planner.notifications()[0]['texte'])
+        runner.tick(self.at(3, 31, day=26))                                # le lendemain : nouveau passage, nouvelle relance permise
+        runner.tick(self.at(4, 35, day=26))
+        self.assertEqual(box.calls, 4)
+        self.assertEqual([a['etat'] for a in self.autonomy.acts()], ['echec', 'echec'])
+
+    def test_the_retry_follows_its_level_and_a_stale_proposal_expires(self):
+        box = Boite(failures=1)
+        runner = self.runner('courrier-nuit', mailbox=box)
+        self.autonomy.set_level('reprendre-tache', 'demander')
+        runner.tick(self.at(3, 31))
+        runner.tick(self.at(4, 35))
+        self.assertEqual(box.calls, 1)                                     # demandé : rien n'est relancé sans réponse
+        act = self.autonomy.acts()[0]
+        self.assertEqual(act['etat'], 'propose')
+        self.assertIn('Relancer la tâche « Relève du courrier', act['resume'])
+        runner.tick(self.at(3, 31, day=26))                                # le passage suivant réussit de lui-même
+        self.autonomy.prune(self.at(3, 40, day=26))
+        self.assertEqual(self.autonomy.get(act['id'])['etat'], 'perime')
+        self.assertEqual(self.autonomy.confirm(act['id']), 'Cette proposition n\'est plus en attente.')
+        # jamais : pas de relance, pas de ligne
+        other = Boite(failures=99)
+        runner = self.runner('courrier-nuit', mailbox=other)
+        self.autonomy.set_level('reprendre-tache', 'jamais')
+        runner.tick(self.at(3, 31, day=27))
+        runner.tick(self.at(4, 35, day=27))
+        self.assertEqual((other.calls, len(self.autonomy.acts())), (1, 1))
+
+    def test_a_backup_is_not_retried_while_its_disk_is_away(self):
+        disk = Disque(Path(self.tmp.name) / 'disque-usb')
+        runner = self.runner('sauvegarde-nuit', backup=disk)
+        runner.tick(self.at(4, 16))
+        self.assertEqual(self.planner.get('sauvegarde-nuit')['resultat'], 'échec : disque absent')
+        runner.tick(self.at(5, 30))
+        self.assertEqual((disk.calls, self.autonomy.acts()), (1, []))      # relancer sans le disque ne servirait à rien
+        disk.path.mkdir()
+        runner.tick(self.at(5, 35))
+        self.assertEqual((disk.calls, self.planner.get('sauvegarde-nuit')['resultat']), (2, 'sauvegarde faite'))
+        self.assertEqual(self.autonomy.acts()[0]['etat'], 'fait')

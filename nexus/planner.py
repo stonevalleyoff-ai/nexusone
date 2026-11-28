@@ -393,6 +393,8 @@ class Runner:
         self.backup = backup          # nexus/backup.py : sauvegarde chiffrée de la nuit
         self.health = health          # nexus/health.py : NEXUS se surveille lui-même
         self.updater = updater        # nexus/update.py : annonce des nouvelles versions (n'installe rien)
+        if autonomy is not None and hasattr(autonomy, 'handle_failure'):
+            autonomy.rerun = self.run_now      # le geste « relancer une tâche en échec » passe par ici
         self._health_at: datetime | None = None
         self._health_seen: set[str] = set()
         self.tempo_fetch, self.deadline_days = tempo_fetch, deadline_days
@@ -428,7 +430,32 @@ class Runner:
                                     f'{exc}'[:300] or type(exc).__name__, task['id'])
             self.planner.record(task['id'], result)
             done.append(task['id'])
+        self._repair(now, done)
         return done
+
+    def _repair(self, now: datetime, just_ran: list[str]) -> None:
+        """Une tâche restée en échec depuis une heure est relancée une fois (nexus/autonomy.py décide : faire,
+        demander ou ne rien faire, et l'inscrit). Sans personne devant, un échec d'une nuit durait jusqu'au lendemain."""
+        if self.autonomy is None or not hasattr(self.autonomy, 'handle_failure'):
+            return
+        from .autonomy import RETRY_MINUTES
+        for task in self.planner.tasks():
+            if not task['active'] or task['id'] in just_ran or not str(task['resultat'] or '').startswith('échec'):
+                continue
+            try:
+                waited = (now - datetime.fromisoformat(task['derniere'])).total_seconds() / 60
+            except (TypeError, ValueError):
+                continue
+            if waited < RETRY_MINUTES:
+                continue
+            if task['type'] == 'sauvegarde' and self.backup is not None:
+                destination = self.backup.destination()
+                if destination is None or not destination.exists():
+                    continue                # disque absent : relancer ne servirait à rien ; on attend qu'il revienne
+            try:
+                self.autonomy.handle_failure(task, now)
+            except Exception:               # la réparation ne doit jamais arrêter les tâches
+                pass
 
     def _watch_health(self, now: datetime) -> None:
         """Toutes les cinq minutes : un constat sérieux qui dure depuis le passage précédent devient une
