@@ -946,6 +946,8 @@ Ce qu'il faut savoir :
 - **Une heure, c'est un choix simple** : assez pour qu'une coupure passe, pas assez pour rattraper une panne de la nuit entière. Le passage du lendemain reste le filet.
 - **Les gestes d'entretien du PC lui-même** (arrêter un programme emballé, relancer un service) ne sont toujours pas dans la liste : dans les essais d'Omni, le modèle les réussit quand il agit, mais il n'agit pas à tous les coups, et NEXUS n'a pas les droits pour le faire depuis sa cage.
 
+**Vérifié aussi, sans rien avoir à changer : le classement en série avec le gros modèle.** Les essais d'Omni montraient que colibrì ne relit pas le début d'une demande qu'il a déjà lu. NEXUS envoie les consignes de classement avant le document, toujours les mêmes : mesuré avec le moteur tenu par NEXUS (Inkling-2-Mini, 4 cœurs, sans carte graphique), trois documents courts à la suite, le premier mot arrive après 118 s, 131 s, puis 65 s. Les consignes (356 jetons sur 700 environ) sont relues pour les deux premiers documents, puis reprises sans être relues. Régler `COLI_PARK_MIN=256` ne fait pas gagner le deuxième. Une tournée de nuit de plusieurs documents en profite donc déjà ; un document isolé, non.
+
 ## 6. Garder ses données : la persistance (avancé)
 
 Par défaut, rien n'est conservé à l'extinction : c'est voulu. Pour garder conversations, modèles téléchargés et réglages, on peut créer une partition de persistance dans l'espace libre de la clé :
