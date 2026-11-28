@@ -989,7 +989,7 @@ Le prompt du premier tour reste minimal, et les consignes de rédaction (citer l
 ## 8. Développer
 
 ```bash
-python3 -m unittest discover -s tests -t .   # 329 tests : faux serveurs Ollama et colibrì, faux moteur géré, faux documents, mémoire, savoir-faire, tâches,
+python3 -m unittest discover -s tests -t .   # 334 tests : faux serveurs Ollama et colibrì, faux moteur géré, faux documents, mémoire, savoir-faire, tâches,
                                              # et un test de non-régression par défaut trouvé en relecture (tests/test_revue.py)
 python3 -m tests.bench_modele                # banc d'essai d'un modèle (demande un moteur qui tourne), faux système, interface sous X
 python3 -m tests.bench_ocr                   # mesure de la reconnaissance de texte (demande tesseract et ImageMagick)

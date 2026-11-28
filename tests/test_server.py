@@ -540,7 +540,8 @@ class AutonomyApiTest(ServerCase):
         self.assertEqual({g: a['etat'] for g, a in done.items()}, {'ranger': 'fait', 'rendez-vous': 'fait'})
         self.assertIn('Rangé : Ordonnance → Santé/2026/', done['ranger']['resume'])
         self.assertEqual(activity['niveaux'], {'ranger': 'prevenir', 'rendez-vous': 'prevenir', 'tache': 'prevenir',
-                                               'rendez-vous-courriel': 'demander', 'tache-courriel': 'demander'})
+                                               'rendez-vous-courriel': 'demander', 'tache-courriel': 'demander',
+                                               'reprendre-tache': 'prevenir'})
         self.assertFalse((self.docs / data['chemin']).exists())                       # parti du dossier d'arrivée
         self.assertEqual(self.call('GET', '/api/rangement')[1]['propositions'], [])
         events = self.call('GET', '/api/agenda')[1]['evenements']
