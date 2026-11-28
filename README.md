@@ -19,7 +19,7 @@ En session Live, **tout se passe en mémoire vive** : le système, les fichiers 
 
 ## 0. Télécharger l'ISO toute prête
 
-L'image toute prête n'est pas distribuée publiquement : son auteur la garde dans un dépôt privé. Si tu y as accès, prendre `nexus-live-amd64.iso`, vérifier son empreinte avec `nexus-live-amd64.iso.sha256`, puis passer directement à l'étape 3. Sinon, la construire (étape 1). Attention : cette image date de la version 0.7 ; pour un mini-PC, suivre plutôt « NEXUS démarre avec le PC ».
+L'image toute prête n'est pas distribuée publiquement : son auteur la garde dans un dépôt privé. Si tu y as accès, prendre `nexus-live-amd64.iso`, vérifier son empreinte avec `nexus-live-amd64.iso.sha256`, puis passer directement à l'étape 3. Sinon, la construire (étape 1). Cette image est celle de la version 0.29 (code `5e1c6fd`, Ollama 0.40.19, `qwen3:1.7b`) ; pour un mini-PC, suivre plutôt « NEXUS démarre avec le PC ».
 
 ## 1. Construire l'ISO
 
@@ -1069,6 +1069,7 @@ Vérifié pendant le développement, sur un hôte Ubuntu 24.04 :
 | 0.26 : sauvegarde avec le vrai restic, 1 200 documents, lancée depuis la cage du service ; exercice du PC mort sur un compte vierge | 1 200 / 1 200 documents identiques, agenda revenu ; vrai disque USB non essayé |
 | 0.27 : santé de NEXUS sur un vrai serveur, moteur arrêté et disque débranché puis réparés | constats justes, alertes reçues par l'abonné en 5 min, journal et appli à jour |
 | 0.28 : mises à jour sous un vrai systemd, compte ordinaire : installation, passage de témoin, version qui plante, annulation | OK (7 vérifications dans la section) ; vrai dépôt GitHub sur un vrai mini-PC non essayé |
+| 0.29 : tâche en échec relancée, avec les vraies bases et la vraie commande ; image ISO construite et démarrée en machine virtuelle (BIOS, émulation) | relance réussie, puis relance en échec sans boucle ; bureau ouvert, fenêtre NEXUS 0.29.0, modèle annoncé prêt ; UEFI, Secure Boot et vrai PC non essayés sur cette image |
 | Question posée dans l'ISO démarrée, réponse reçue et enregistrée | OK en 0.6 ; en 0.7, la consultation part bien, mais la réponse dépasse 10 min en émulation |
 
 ![NEXUS dans l'ISO démarrée en UEFI avec Secure Boot](docs/vm-uefi-secureboot.png)
